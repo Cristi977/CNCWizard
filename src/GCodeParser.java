@@ -39,6 +39,9 @@ public class GCodeParser {
             // Handle Macros (E80050=34)
             if (token.contains("=")) {
                 String[] parts = token.split("=");
+                if (parts[0].equals("E30050")){
+                    currentState.E30050.put(currentNBlock, Double.parseDouble(parts[1]));
+                }
                 if (parts.length == 2) {
                     try {
                         targetState.machineVariables.put(parts[0].toUpperCase(), Double.parseDouble(parts[1]));
@@ -56,13 +59,6 @@ public class GCodeParser {
                         // Daca gasim un N-Code, inregistram blocul curent
                         if (prefix.equals("N")) {
                             currentNBlock = token.toUpperCase(); // ex: N0090
-                        }
-                        else if (prefix.equals("T")) {
-                            // Only add tool if it isn't already loaded to prevent duplicates
-                            String tool = prefix + number;
-                            if (!targetState.tools.contains(tool)) {
-                                targetState.tools.add(tool);
-                            }
                         }
                         else if (prefix.equals("G") || prefix.equals("M")) {
                             // (G and M could be stored in targetState if you want to track them)
@@ -93,13 +89,14 @@ public class GCodeParser {
     private static void handleSubprogramCall(String subprogramName) {
         System.out.println("Found subprogram call in line: " + subprogramName);
 
-        // 1. You would extract the filename from the line (e.g., "PART2.NUM")
-
-        Pattern pattern = Pattern.compile("([a-zA-Z0-9]+_TYP[0-9]+_[0-9]{2}[a-zA-Z]{2}\\.anc)");
-        Matcher matcher = pattern.matcher(subprogramName);
+        Pattern namePattern = Pattern.compile("([a-zA-Z0-9]+_TYP[0-9]+_([0-9]{2})_((?:[A-Z]+_)?[A-Z0-9]+)\\.anc)");
+        Matcher matcher = namePattern.matcher(subprogramName);
         if (matcher.find()){
             String subprogram = matcher.group(1);
             MachineState subprogramState = new MachineState();
+            String subNumber = matcher.group(2);
+            String tool = matcher.group(3);
+
             try {
                 BufferedReader buffer = new BufferedReader(new FileReader(subprogram));
                 String line = "";
@@ -112,14 +109,6 @@ public class GCodeParser {
             }
             currentState.compareWithSubprogram(subprogramState, subprogram);
         }
-        // 2. You would open that file and read its header/initial lines.
-        // 3. You create a TEMPORARY MachineState for that subprogram to see what it requires.
-        // 4. Finally, compare it to the main program's current state:
-
-        /* Pseudo-code example:
-           MachineState subprogramInitialState = parseSubprogramHeader(fileName);
-           currentState.compareWithSubprogram(subprogramInitialState, fileName);
-        */
     }
 
     public static void clearMemory() {
@@ -135,4 +124,4 @@ public class GCodeParser {
     }
 }
 //TO DO:
-//  -Scoate numele sculelor din numele fisierelor
+//  -baga datele in tabelul din WizardTool -> baga cumva subNumber in cheia de la E30050 ca sa o folosesti ca primary key

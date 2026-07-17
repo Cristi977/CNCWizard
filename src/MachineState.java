@@ -6,9 +6,9 @@ import java.util.Map;
 public class MachineState {
     public Map<String, Double> machineVariables = new HashMap<>();
     public Map<String, Double> g178 = new HashMap<>();
-    public Map<String, Double> g151 = new HashMap<>();
+    public Map<String, Double> g151 = new HashMap<>();      //checking memory addresses for overwriting G171
     public Map<String, Double> E30050 = new HashMap<>();
-    public List<String> tools = new ArrayList<>();
+    public Map<String, String> tools = new HashMap<>();          //How to structure the code for CNCs with +1 spindles
 
     // Constructor implicit (Blank state)
     public MachineState() {}
@@ -18,8 +18,8 @@ public class MachineState {
         this.machineVariables.putAll(previousState.machineVariables);
         this.g178.putAll(previousState.g178);
         this.g151.putAll(previousState.g151);
-        this.E30050.putAll(previousState.E30050); // <--- YOU NEED THIS LINE
-        this.tools.addAll(previousState.tools);
+        this.E30050.putAll(previousState.E30050);
+        this.tools.putAll(previousState.tools);
     }
 
     // 4. METODA DE VERIFICARE A SUBPROGRAMELOR
@@ -31,6 +31,9 @@ public class MachineState {
         }
         if (!this.g151.equals(subprogramState.g151)) {
             System.err.println("WARNING: G178 parameters mismatch!");
+        }
+        if (!this.E30050.equals(subprogramState.E30050)) {
+            System.err.println("WARNING: E30050 parameter mismatch!");
         }
         if (!this.tools.equals(subprogramState.tools)) {
             System.err.println("WARNING: Tools list mismatch!");
