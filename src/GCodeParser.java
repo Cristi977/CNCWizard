@@ -42,6 +42,14 @@ public class GCodeParser {
                 if (parts[0].equals("E30050")){
                     currentState.E30050.put(currentNBlock, Double.parseDouble(parts[1]));
                 }
+                if (parts[0].equals("E80050")){
+                    switch (parts[1]){
+                        case "34": currentState.E80050.put(currentNBlock, Double.parseDouble(parts[1]));
+                        case "75": currentState.E80050.put(currentNBlock, Double.parseDouble(parts[1]));
+                        case "115": currentState.E80050.put(currentNBlock, Double.parseDouble(parts[1]));
+
+                    }
+                }
                 if (parts.length == 2) {
                     try {
                         targetState.machineVariables.put(parts[0].toUpperCase(), Double.parseDouble(parts[1]));

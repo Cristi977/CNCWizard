@@ -5,10 +5,11 @@ import java.util.Map;
 
 public class MachineState {
     public Map<String, Double> machineVariables = new HashMap<>();
+    public Map<String, Double> E80050 = new HashMap<>();              //Display as code (34,75,115) or as one int (0,1,2...) && Does parameter T bother me?
     public Map<String, Double> g178 = new HashMap<>();
-    public Map<String, Double> g151 = new HashMap<>();      //checking memory addresses for overwriting G171
+    public Map<String, Double> g151 = new HashMap<>();              //checking memory addresses for overwriting G171
     public Map<String, Double> E30050 = new HashMap<>();
-    public Map<String, String> tools = new HashMap<>();          //How to structure the code for CNCs with +1 spindles
+    public Map<String, String> tools = new HashMap<>();             //How to structure the code for CNCs with +1 spindles
 
     // Constructor implicit (Blank state)
     public MachineState() {}
@@ -34,9 +35,6 @@ public class MachineState {
         }
         if (!this.E30050.equals(subprogramState.E30050)) {
             System.err.println("WARNING: E30050 parameter mismatch!");
-        }
-        if (!this.tools.equals(subprogramState.tools)) {
-            System.err.println("WARNING: Tools list mismatch!");
         }
     }
 }

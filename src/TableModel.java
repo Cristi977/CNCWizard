@@ -12,7 +12,7 @@ public class TableModel extends AbstractTableModel {
     private final Map<String, Double> doubleMap;  // Second map (Double values)
 
     // Adjust these headers to fit your actual data
-    private final String[] columns = {"Key", "String Data", "Double Data"};
+    private final String[] columns = {"sequence", "Tool", "speed"};
 
     public TableModel(Map<String, String> stringMap, Map<String, Double> doubleMap) {
         this.stringMap = stringMap;
