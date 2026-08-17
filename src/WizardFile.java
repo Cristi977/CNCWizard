@@ -40,14 +40,11 @@ public class WizardFile extends JFrame {
                     while ((line =buffer.readLine()) != null) {
                         GCodeParser.parseLine(line, GCodeParser.currentState);
                     }
-                    System.out.println("Current Tools: " + GCodeParser.currentState.tools);
-                    System.out.println("Offset: " + GCodeParser.currentState.g178);
-                    System.out.println("E30050: " + GCodeParser.currentState.E30050);
                 } catch (IOException er) {
                     System.out.println(er);
                 }
-                JFrame offsets = new JFrame("Offsets");
-                offsets.setContentPane(new WizardOffset().getMainPanel());
+                JFrame offsets = new JFrame("table selection");
+                offsets.setContentPane(new WizardTableSelection().getMainPanel());
                 offsets.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
                 offsets.setSize(700, 600);
                 offsets.setLocationRelativeTo(null);
@@ -58,5 +55,8 @@ public class WizardFile extends JFrame {
                 JFrame currentFrame = (JFrame) SwingUtilities.getWindowAncestor(MainPanel);
                 currentFrame.dispose();
         });
+    }
+    public JPanel getMainPanel() {
+        return this.MainPanel;
     }
 }

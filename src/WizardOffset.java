@@ -20,23 +20,34 @@ public class WizardOffset extends JFrame{
         backButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JFrame Wizzard = new JFrame("Searching Program");
-                Wizzard.setContentPane(new WizardFile());
-                Wizzard.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                setSize(700, 600);
-                Wizzard.setLocationRelativeTo(null);
-                Wizzard.setVisible(true);
+                JFrame offsets = new JFrame("table selection");
+                offsets.setContentPane(new WizardTableSelection().getMainPanel());
+                offsets.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                offsets.setSize(700, 600);
+                offsets.setLocationRelativeTo(null);
+                offsets.setVisible(true);
+
+                // 2. Close the current window
+                // We use SwingUtilities to find the JFrame that holds this panel
+                JFrame currentFrame = (JFrame) SwingUtilities.getWindowAncestor(MainPanel);
+                currentFrame.dispose();
             }
         });
         nextButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                JFrame Wizzard = new JFrame("Tools");
-                Wizzard.setContentPane(new WizardTool().getMainPanel());
-                Wizzard.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                Wizzard.setSize(700, 600);
-                Wizzard.setLocationRelativeTo(null);
-                Wizzard.setVisible(true);
+                JFrame wizardFrame = new JFrame("Tools");
+
+                // Instantiate WizardTool once so its constructor runs and populates the table
+                WizardTool wizardTool = new WizardTool();
+
+                wizardFrame.setContentPane(wizardTool.getMainPanel());
+                wizardFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                wizardFrame.setSize(700, 600);
+                wizardFrame.setLocationRelativeTo(null);
+                wizardFrame.setVisible(true);
+                JFrame currentFrame = (JFrame) SwingUtilities.getWindowAncestor(MainPanel);
+                currentFrame.dispose();
             }
         });
     }
