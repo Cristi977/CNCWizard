@@ -31,6 +31,7 @@ public class WizardFile extends JFrame {
                     return;
                 }
                 System.out.println(file);
+                GCodeParser.activeProgramFile = file;
                 GCodeParser.clearMemory();
                     //Read file
                 try {

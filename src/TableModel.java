@@ -1,4 +1,8 @@
 import javax.swing.table.AbstractTableModel;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.*;
 
 public class TableModel extends AbstractTableModel {
@@ -7,12 +11,13 @@ public class TableModel extends AbstractTableModel {
     private final List<String> displayTools = new ArrayList<>();
     private final List<Integer> displayTs = new ArrayList<>();     // Track T as integers
     private final List<Double> displaySpeeds = new ArrayList<>();
+    private File file;
+
 
     private final String[] columns = {"Sequence / N-Code", "Tool Used", "Tool Index (Editable)", "Speed / E30050"};
 
     // Updated constructor taking all three maps
     public TableModel(Map<String, String> toolMap, Map<String, Double> tMap, Map<String, Double> e30050Map) {
-
         // 1. Collect keys from ALL maps so we don't miss lines that update modal states
         Set<String> allKeys = new HashSet<>();
         if (toolMap != null) allKeys.addAll(toolMap.keySet());
@@ -130,15 +135,32 @@ public class TableModel extends AbstractTableModel {
 
                 // 4. Tell Swing to redraw this specific cell
                 fireTableCellUpdated(rowIndex, columnIndex);
+                // 5. Change the GCode macro
+                File currentFile = GCodeParser.activeProgramFile;
 
-                updateGCodeLine(nBlockKey, newTValue);
+                if (currentFile != null) {
+                    System.out.println("We are now editing: " + currentFile.getAbsolutePath());
+                    System.out.println("Block: " + nBlockKey + " gets new T value: " + newTValue);
+                    try {
+                        BufferedReader buffer = new BufferedReader(new FileReader(currentFile));
+                        String line = "";
+                        Map<String, Object> atributes = new HashMap<>();
+                        while ((line =buffer.readLine()) != null) {             //Dono if it works; done work 17.08
+                            if (line.matches("^\\s*" + nBlockKey + "\\b.*")){
+                                String updatedLine = line.replaceFirst("\\bT\\s*=?\\s*\\d+", "T" + newTValue);
+
+                                System.out.println("Original Line: " + line);
+                                System.out.println("Updated Line:  " + updatedLine);
+                            }
+                        }
+                    } catch (IOException er) {
+                        System.out.println(er);
+                    }
+                }
 
             } catch (NumberFormatException e) {
                 System.err.println("Invalid input: Please enter a whole number for the Tool Index.");
             }
         }
-    }
-    public void updateGCodeLine(String NBlock, double newTValue){
-        //update GCode but first get the file from WizardFile
     }
 }

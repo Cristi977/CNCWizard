@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
@@ -9,6 +10,7 @@ public class GCodeParser {
     // Starea curenta a masinii "in timp real"
     public static MachineState currentState = new MachineState();
     public static MachineState getCurrentState(){return currentState;}
+    public static File activeProgramFile;    //gets the cnc program from WizardFile so it can be reused
 
     // Istoricul salvarilor pe blocuri N (Ex: "N0090" -> Starea la acel moment)
     public static Map<String, MachineState> sequenceHistory = new LinkedHashMap<>();
