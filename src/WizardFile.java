@@ -1,22 +1,21 @@
 import javax.swing.*;
-import java.awt.*;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
 
-public class Wizard extends JFrame {
+public class WizardFile extends JFrame {
     private JTextField productCodeTField;
     private JPanel MainPanel;
     private JButton OKButton;
     private JTextField productTypeTField;
     private JLabel errorLabel;
 
-    public Wizard(){
+    public WizardFile(){
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setContentPane(MainPanel);
-        setSize(400, 300);
+        setSize(700, 600);
         setTitle("Searching Program");
         setLocationRelativeTo(null);
         setResizable(false);
@@ -41,16 +40,13 @@ public class Wizard extends JFrame {
                     while ((line =buffer.readLine()) != null) {
                         GCodeParser.parseLine(line, GCodeParser.currentState);
                     }
-                    System.out.println("Current Tools: " + GCodeParser.currentState.tools);
-                    System.out.println("Offset:" + GCodeParser.currentState.g178);
-                    System.out.println("Sequence History Size: " + GCodeParser.sequenceHistory.size());
                 } catch (IOException er) {
                     System.out.println(er);
                 }
-                JFrame offsets = new JFrame("Offsets");
-                offsets.setContentPane(new WizardOffset().getMainPanel());
+                JFrame offsets = new JFrame("table selection");
+                offsets.setContentPane(new WizardTableSelection().getMainPanel());
                 offsets.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                offsets.setSize(400, 300);
+                offsets.setSize(700, 600);
                 offsets.setLocationRelativeTo(null);
                 offsets.setVisible(true);
 
@@ -59,5 +55,8 @@ public class Wizard extends JFrame {
                 JFrame currentFrame = (JFrame) SwingUtilities.getWindowAncestor(MainPanel);
                 currentFrame.dispose();
         });
+    }
+    public JPanel getMainPanel() {
+        return this.MainPanel;
     }
 }
