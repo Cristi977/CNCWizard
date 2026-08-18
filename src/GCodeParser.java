@@ -10,10 +10,12 @@ public class GCodeParser {
     // Starea curenta a masinii "in timp real"
     public static MachineState currentState = new MachineState();
     public static MachineState getCurrentState(){return currentState;}
-    public static File activeProgramFile;    //gets the cnc program from WizardFile so it can be reused
+    public static File activeProgramFile;
+    public static Map<String, Set<File>> tToSubprogramsMap = new HashMap<>();
 
     // Istoricul salvarilor pe blocuri N (Ex: "N0090" -> Starea la acel moment)
     public static Map<String, MachineState> sequenceHistory = new LinkedHashMap<>();
+    public static Map<String, File> fileMap = new HashMap<>();
 
     private static final Pattern CNC_PATTERN = Pattern.compile("^([A-Za-z]+)([-+]?[0-9]*\\.?[0-9]*)$");
 
@@ -97,15 +99,21 @@ public class GCodeParser {
         Matcher matcher = namePattern.matcher(subprogramName);
         if (matcher.find()){
             String subprogram = matcher.group(1);
+            File subprogramFile = new File(subprogram);
+            if (currentNblock != null) {
+                tToSubprogramsMap
+                        .computeIfAbsent(currentNblock, k -> new LinkedHashSet<>())
+                        .add(subprogramFile);
+            }
             MachineState subprogramState = new MachineState();
             String subNumber = matcher.group(2);
             String tool = matcher.group(3);
             currentState.tools.put(currentNblock, tool);
+            fileMap.put(currentNblock, subprogramFile);
 
             try {
                 BufferedReader buffer = new BufferedReader(new FileReader(subprogram));
                 String line = "";
-                Map<String, Object> atributes = new HashMap<>();
                 while ((line = buffer.readLine()) != null) {
                     GCodeParser.parseLine(line, subprogramState);
                 }
@@ -114,6 +122,10 @@ public class GCodeParser {
             }
             currentState.compareWithSubprogram(subprogramState, subprogram);
         }
+    }
+    public static void registerSubprogramCall(String tBlockKey, File subprogramFile) {
+        if (tBlockKey == null || subprogramFile == null) return;
+        tToSubprogramsMap.computeIfAbsent(tBlockKey, k -> new HashSet<>()).add(subprogramFile);
     }
 
     public static void clearMemory() {
@@ -129,4 +141,3 @@ public class GCodeParser {
     }
 }
 //TO DO:
-//  -baga datele in tabelul din WizardTool -> baga cumva subNumber in cheia de la E30050 ca sa o folosesti ca primary key
