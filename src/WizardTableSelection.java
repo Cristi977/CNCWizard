@@ -11,11 +11,9 @@ public class WizardTableSelection extends JFrame{
     private JButton nextButton;
 
     public WizardTableSelection(){
-        int table = GCodeParser.getCurrentState().E80050;
+        String table = GCodeParser.getCurrentState().E80050;
         //aditional processing: switch(table): case
-        switch (table){
-            case 34: TableValue.setText("1");
-        }
+        TableValue.setText(table);
         // if u need 34, let: TableValue.setText(String.valueOf(table));
         nextButton.addActionListener(new ActionListener() {
             @Override

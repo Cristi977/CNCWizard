@@ -5,7 +5,7 @@ import java.util.Map;
 
 public class MachineState {
     public Map<String, Double> machineVariables = new HashMap<>();
-    public int E80050 = 0; //if only one value                        //Display as code (34,75,115) or as one int (0,1,2...) && Does parameter T bother me?
+    public String E80050; //if only one value                        //Display as code (34,75,115) or as one int (0,1,2...) && Does parameter T bother me?
     public Map<String, Double> g178 = new HashMap<>();
     public Map<String, Double> g151 = new HashMap<>();              //checking memory addresses for overwriting G171
     public Map<String, Double> E30050 = new HashMap<>();

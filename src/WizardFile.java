@@ -36,13 +36,15 @@ public class WizardFile extends JFrame {
                     //Read file
                 try {
                     BufferedReader buffer = new BufferedReader(new FileReader(file));
-                    String line = "";
+                    String line;
                     Map<String, Object> atributes = new HashMap<>();
                     while ((line =buffer.readLine()) != null) {
                         GCodeParser.parseLine(line, GCodeParser.currentState);
+                        GCodeParser.activeProgramFile = file;
+                        GCodeParser.baseDirectory = file.getParentFile();
                     }
                 } catch (IOException er) {
-                    System.out.println(er);
+                    System.err.println(er);
                 }
                 JFrame offsets = new JFrame("table selection");
                 offsets.setContentPane(new WizardTableSelection().getMainPanel());

@@ -1,8 +1,8 @@
 import javax.swing.table.AbstractTableModel;
-import java.io.File;
-import java.io.RandomAccessFile;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class TableModel extends AbstractTableModel {
 
@@ -35,7 +35,6 @@ public class TableModel extends AbstractTableModel {
         double lastKnownSpeed = 0.0;
         int lastKnownT = 0;
         String lastKnownTKey = "";
-        File lastKnownFile = null;
 
         for (String key : sortedKeys) {
             if (e30050Map != null && e30050Map.containsKey(key)) {
@@ -48,19 +47,22 @@ public class TableModel extends AbstractTableModel {
                 if (tVal != null) {
                     lastKnownT = (int) tVal.doubleValue();
                     lastKnownTKey = key;
-                    if (GCodeParser.fileMap != null) {
-                        lastKnownFile = GCodeParser.fileMap.get(key);
-                    }
                 }
             }
 
             if (toolMap != null && toolMap.containsKey(key)) {
+                // Since the subprogram is on the tool's N-block (key), fetch it here!
+                File currentFile = null;
+                if (GCodeParser.subprogramFiles != null) {
+                    currentFile = GCodeParser.subprogramFiles.get(key);
+                }
+
                 displayNCodes.add(key);
                 displayTools.add(toolMap.get(key));
                 displayTs.add(lastKnownT);
                 displaySpeeds.add(lastKnownSpeed);
                 displayTKeys.add(lastKnownTKey);
-                displayTFiles.add(lastKnownFile);
+                displayTFiles.add(currentFile);
             }
         }
     }
@@ -119,54 +121,68 @@ public class TableModel extends AbstractTableModel {
 
                 if (newTValue == previousTValue) return;
 
-                // Get the exact T-Block Key for this row
+                // Get the T-Block Key (used for updating table state & backend T values)
                 String tBlockKey = displayTKeys.get(rowIndex);
                 if (tBlockKey == null || tBlockKey.isEmpty()) return;
 
-                // 1. UPDATE ALL ROWS IN THE TABLE THAT SHARE THIS SAME T-BLOCK KEY
+                // 1. UPDATE ALL TABLE ROWS THAT SHARE THIS SAME T-BLOCK KEY
                 for (int i = 0; i < displayTKeys.size(); i++) {
                     if (displayTKeys.get(i).equals(tBlockKey)) {
                         displayTs.set(i, newTValue);
                     }
                 }
 
-                // 2. Update the global parser backend state
-                GCodeParser.currentState.T.put(tBlockKey, (double) newTValue);
+                // 2. FETCH THE FILE DIRECTLY USING THE ROW'S PRE-MAPPED FILE
+                File currentSubprogram = displayTFiles.get(rowIndex);
 
-                // 3. Tell Swing to redraw the entire table so all affected rows update visually
-                fireTableDataChanged();
+                if (currentSubprogram != null && currentSubprogram.exists()) {
+                    System.out.println("Found subprogram file for row " + rowIndex + ": " + currentSubprogram.getAbsolutePath());
 
-                // 4. In-Place File Overwrite (Updates the physical file once)
-                File currentFile = displayTFiles.get(rowIndex);
-                if (currentFile != null) {
-                    String oldTStr = String.format("%03d", previousTValue);
-                    String newTStr = String.format("%03d", newTValue);
+                    Pattern toolPattern = Pattern.compile("\\(T(\\d+)\\s+T<(\\d)(\\d+)>\\)");
 
-                    System.out.println("Editing File: " + currentFile.getAbsolutePath());
-                    System.out.println("Target T-Block: " + tBlockKey + " | Changing T" + oldTStr + " -> T" + newTStr);
-
-                    try (RandomAccessFile raf = new RandomAccessFile(currentFile, "rw")) {
+                    try (RandomAccessFile raf = new RandomAccessFile(currentSubprogram, "rw")) {
                         String line;
-                        long lineStartPointer = raf.getFilePointer();
+                        long lineStart = 0;
 
                         while ((line = raf.readLine()) != null) {
+                            long lineEnd = raf.getFilePointer();
 
-                            if (line.matches("^\\s*" + tBlockKey + "\\b.*")) {
-                                String updatedLine = line.replaceFirst("\\bT\\s*=?\\s*" + oldTStr + "\\b", "T" + newTStr);
+                            Matcher matcher = toolPattern.matcher(line);
+                            if (matcher.find()) {
+                                System.out.println("FOUND MATCH in file: " + line);
 
-                                if (!line.equals(updatedLine)) {
-                                    raf.seek(lineStartPointer);
-                                    raf.writeBytes(updatedLine);
-                                    System.out.println("Successfully updated file in-place: " + updatedLine);
+                                String replacementBlock = "(T" + newTValue + " T<" + GCodeParser.currentState.E80050 + newTValue + ">)";
+
+                                String newLine = line.substring(0, matcher.start()) +
+                                        replacementBlock +
+                                        line.substring(matcher.end());
+
+                                if (newLine.length() == line.length()) {
+                                    raf.seek(lineStart);
+                                    raf.writeBytes(newLine);
+                                    raf.seek(lineEnd);
+                                    System.out.println("SUCCESSFULLY WROTE TO FILE!");
+                                } else {
+                                    System.err.println("BLOCKED BY LENGTH CHECK! Old length: " + line.length() + " | New length: " + newLine.length());
                                 }
-                                break;
                             }
-                            lineStartPointer = raf.getFilePointer();
+                            lineStart = lineEnd;
                         }
                     } catch (IOException er) {
                         System.err.println("File write error: " + er);
                     }
-                }
+                } else {
+                    if (currentSubprogram == null) {
+                        System.err.println("ERROR: File is NULL for row " + rowIndex);
+                    } else {
+                        System.err.println("ERROR: File object exists, but physical file NOT FOUND at: " + currentSubprogram.getAbsolutePath());
+                    }                }
+
+                // 3. Update the global parser backend state
+                GCodeParser.currentState.T.put(tBlockKey, (double) newTValue);
+
+                // 4. Tell Swing to redraw the table visually
+                fireTableDataChanged();
 
             } catch (NumberFormatException e) {
                 System.err.println("Invalid input: Please enter a valid number for the Tool Index.");
