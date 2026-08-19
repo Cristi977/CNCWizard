@@ -42,7 +42,7 @@ public class GCodeParser {
                     }
                     if (parts[0].equals("E80050")){
                         switch (parts[1]){
-                            case "34": currentState.E80050="0";
+                            case "34": currentState.E80050="1";
                         }
                     }
                     if (parts.length == 2) {

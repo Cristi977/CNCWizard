@@ -124,6 +124,35 @@ public class TableModel extends AbstractTableModel {
                 // Get the T-Block Key (used for updating table state & backend T values)
                 String tBlockKey = displayTKeys.get(rowIndex);
                 if (tBlockKey == null || tBlockKey.isEmpty()) return;
+                if (GCodeParser.activeProgramFile != null && GCodeParser.activeProgramFile.exists()) {
+                    try {
+                        List<String> mainLines = java.nio.file.Files.readAllLines(GCodeParser.activeProgramFile.toPath());
+                        boolean mainModified = false;
+
+                        for (int i = 0; i < mainLines.size(); i++) {
+                            String line = mainLines.get(i);
+
+                            // Check if this line contains the correct N-block for this row
+                            if (line.contains(tBlockKey)) {
+                                System.out.println("FOUND N-BLOCK IN MAIN FILE: " + line);
+
+                                // Update the T value or variable in the main file line
+                                // (Adjust this replacement depending on how your main file stores the T value, e.g., T5 -> T100)
+                                String updatedLine = line.replaceAll("T\\d+", "T" + newTValue);
+
+                                mainLines.set(i, updatedLine);
+                                mainModified = true;
+                            }
+                        }
+
+                        if (mainModified) {
+                            java.nio.file.Files.write(GCodeParser.activeProgramFile.toPath(), mainLines);
+                            System.out.println("SUCCESSFULLY UPDATED MAIN FILE!");
+                        }
+                    } catch (IOException e) {
+                        System.err.println("Error updating main file: " + e.getMessage());
+                    }
+                }
 
                 // 1. UPDATE ALL TABLE ROWS THAT SHARE THIS SAME T-BLOCK KEY
                 for (int i = 0; i < displayTKeys.size(); i++) {

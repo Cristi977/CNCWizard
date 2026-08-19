@@ -11,6 +11,7 @@ public class MachineState {
     public Map<String, Double> E30050 = new HashMap<>();
     public Map<String, String> tools = new HashMap<>();             //What you need for +1 spindles CNCs
     public Map<String, Double> T = new HashMap<>();
+    public int machineVariable;
 
     // Constructor implicit (Blank state)
     public MachineState() {}
