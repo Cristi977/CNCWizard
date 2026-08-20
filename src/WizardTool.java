@@ -40,7 +40,7 @@ public class WizardTool {
         activeInstance = this;
 
         if (ToolTable != null && tools != null) {
-            ToolTable.setModel(new TableModel(tools, T, e30050));
+            ToolTable.setModel(new TableModel(tools, T, GCodeParser.currentState.E80050));
         }
         backButton.addActionListener(new ActionListener() {
             @Override

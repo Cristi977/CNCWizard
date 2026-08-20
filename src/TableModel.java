@@ -29,14 +29,15 @@ public class TableModel extends AbstractTableModel {
     private final List<Double> displaySpeeds = new ArrayList<>();
     private final List<String> displayTKeys = new ArrayList<>();
     private final List<File> displayTFiles = new ArrayList<>();
+    private final List<String> displayTables = new ArrayList<>();
 
-    private final String[] columns = {"Sequence / N-Code", "Tool Used", "Tool Index (Editable)", "Speed / E30050"};
+    private final String[] columns = {"Sequence / N-Code", "Tool Used", "Tool Index (Editable)", "Selected Table"};
 
-    public TableModel(Map<String, String> toolMap, Map<String, Double> tMap, Map<String, Double> e30050Map) {
+    public TableModel(Map<String, String> toolMap, Map<String, Double> tMap, Map<String, Integer> e80050Map) {
         Set<String> allKeys = new HashSet<>();
         if (toolMap != null) allKeys.addAll(toolMap.keySet());
         if (tMap != null) allKeys.addAll(tMap.keySet());
-        if (e30050Map != null) allKeys.addAll(e30050Map.keySet());
+        if (e80050Map != null) allKeys.addAll(e80050Map.keySet());
 
         List<String> sortedKeys = new ArrayList<>(allKeys);
         sortedKeys.sort((k1, k2) -> {
@@ -52,10 +53,11 @@ public class TableModel extends AbstractTableModel {
         double lastKnownSpeed = 0.0;
         int lastKnownT = 0;
         String lastKnownTKey = "";
+        String lastKnownTableIndex = "0";
 
         for (String key : sortedKeys) {
-            if (e30050Map != null && e30050Map.containsKey(key)) {
-                Double val = e30050Map.get(key);
+            if (e80050Map != null && e80050Map.containsKey(key)) {
+                Integer val = e80050Map.get(key);
                 if (val != null) lastKnownSpeed = val;
             }
 
@@ -64,6 +66,14 @@ public class TableModel extends AbstractTableModel {
                 if (tVal != null) {
                     lastKnownT = (int) tVal.doubleValue();
                     lastKnownTKey = key;
+                }
+            }
+            if (e80050Map != null && e80050Map.containsKey(key)) {
+                Integer val = e80050Map.get(key);
+                if (val != null) {
+                    // Translate it immediately using your logic!
+                    char firstDigit = GCodeParser.currentState.getE80050FirstDigit(key); // or your method
+                    lastKnownTableIndex = String.valueOf(firstDigit);
                 }
             }
 
@@ -80,6 +90,7 @@ public class TableModel extends AbstractTableModel {
                 displaySpeeds.add(lastKnownSpeed);
                 displayTKeys.add(lastKnownTKey);
                 displayTFiles.add(currentFile);
+                displayTables.add(lastKnownTableIndex);
             }
         }
     }
@@ -101,8 +112,9 @@ public class TableModel extends AbstractTableModel {
 
     @Override
     public Class<?> getColumnClass(int col) {
+        if (col == 1) return String.class;
         if (col == 2) return Integer.class;
-        if (col == 3) return Double.class;
+        if (col == 3) return Integer.class;
         return String.class;
     }
 
@@ -112,18 +124,40 @@ public class TableModel extends AbstractTableModel {
             case 0: return displayNCodes.get(rowIndex);
             case 1: return displayTools.get(rowIndex);
             case 2: return displayTs.get(rowIndex);
-            case 3: return displaySpeeds.get(rowIndex);
+            case 3: return displayTables.get(rowIndex);
             default: return null;
         }
     }
 
     @Override
     public boolean isCellEditable(int rowIndex, int columnIndex) {
-        return columnIndex == 2;
+        return columnIndex == 2 || columnIndex == 3;
     }
 
     @Override
     public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
+        String tBlockKey = displayTKeys.get(rowIndex);
+        if (columnIndex == 3) {
+            String inputStr = aValue.toString().toUpperCase().trim();
+            // Eventual constrains on the input
+            try{
+                String previousTValue = displayTables.get(rowIndex);
+                // Updating the CNC program
+
+                // 1. UPDATE ALL TABLE ROWS THAT SHARE THIS SAME T-BLOCK KEY
+                for (int i = 0; i < displayTKeys.size(); i++) {
+                    if (displayTKeys.get(i).equals(tBlockKey)) {
+                        displayTables.set(i, inputStr);
+                    }
+                }
+                if (inputStr.equals(previousTValue)) return;
+                displayTables.set(rowIndex, inputStr);
+                fireTableDataChanged();
+
+            } catch (NumberFormatException e) {
+                throw new RuntimeException(e);
+            }
+        }
         if (columnIndex == 2) {
             String inputStr = aValue.toString().trim();
 
@@ -139,7 +173,6 @@ public class TableModel extends AbstractTableModel {
                 if (newTValue == previousTValue) return;
 
                 // Get the T-Block Key (used for updating table state & backend T values)
-                String tBlockKey = displayTKeys.get(rowIndex);
                 if (tBlockKey == null || tBlockKey.isEmpty()) return;
                 if (GCodeParser.activeProgramFile != null && GCodeParser.activeProgramFile.exists()) {
                     try {
@@ -197,8 +230,10 @@ public class TableModel extends AbstractTableModel {
                             if (matcher.find()) {
                                 System.out.println("FOUND MATCH in file: " + line);
 
-                                String replacementBlock = "(T" + newTValue + " T<" + GCodeParser.currentState.getE80050FirstDigit() + newTValue + ">)";
+                                String zeroTValue = String.valueOf(newTValue).substring(1);
+                                char firstDigit = GCodeParser.currentState.getE80050FirstDigit(tBlockKey);
 
+                                String replacementBlock = "(T" + newTValue + " T<" + firstDigit + "0" + zeroTValue + ">)";
                                 String newLine = line.substring(0, matcher.start()) +
                                         replacementBlock +
                                         line.substring(matcher.end());

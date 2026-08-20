@@ -27,11 +27,9 @@ public class WizardTableSelection extends JFrame{
     private JLabel ToolIndexValue;
 
     public WizardTableSelection(){
-        Table.setText("Table: " + GCodeParser.currentState.getE80050FirstDigit());
-        ToolIndexValue.setText("Tool Index: " + GCodeParser.currentState.getE80050ToolIndex());
-        System.out.println("DEBUG - First Digit: " + GCodeParser.currentState.getE80050FirstDigit());
-        System.out.println("DEBUG - Tool Index: " + GCodeParser.currentState.getE80050ToolIndex());
-
+        /*Table.setText("Table: " + GCodeParser.currentState.getE80050FirstDigit());
+        * ToolIndexValue.setText("Tool Index: " + GCodeParser.currentState.getE80050ToolIndex());
+        */
         nextButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
