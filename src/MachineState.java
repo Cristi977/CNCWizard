@@ -22,7 +22,7 @@ import java.util.Map;
 
 public class MachineState {
     public Map<String, Double> machineVariables = new HashMap<>();
-    public String E80050; //if only one value                        //Display as code (34,75,115) or as one int (0,1,2...) && Does parameter T bother me?
+    public int E80050; //if only one value                        //Display as code (34,75,115) or as one int (0,1,2...) && Does parameter T bother me?
     public Map<String, Double> g178 = new HashMap<>();
     public Map<String, Double> g151 = new HashMap<>();              //checking memory addresses for overwriting G171
     public Map<String, Double> E30050 = new HashMap<>();
@@ -52,6 +52,23 @@ public class MachineState {
         }
         if (!this.g151.equals(subprogramState.g151)) {
             //System.err.println("WARNING: G178 parameters mismatch!");
+        }
+    }
+    public char getE80050FirstDigit(){
+        switch (String.valueOf(E80050).charAt(0)){
+            case '3': return '0';
+            case '7': return '1';
+            case '1': return '2';
+            default: return 'X';
+        }
+    }
+    public String getE80050ToolIndex(){
+        char firstDigit = getE80050FirstDigit();
+        switch (firstDigit){
+            case '0': return String.valueOf(E80050 - 30);
+            case '1': return String.valueOf(E80050 - 70);
+            case '2': return String.valueOf(E80050 - 110);
+            default: return "";
         }
     }
 }

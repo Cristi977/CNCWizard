@@ -19,15 +19,16 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 import java.util.Map;
 
 public class WizardTool {
     private JTable ToolTable;
-    private JButton nextButton;
-    private JButton backButton;
+    private JButton saveChangesButton;
     private JPanel MainPanel;
     private JScrollPane ScrollPanel;
     private JLabel Logs;
+    private JButton backButton;
 
     public static WizardTool activeInstance;
 
@@ -52,6 +53,23 @@ public class WizardTool {
                 Wizzard.setVisible(true);
                 JFrame currentFrame = (JFrame) SwingUtilities.getWindowAncestor(MainPanel);
                 currentFrame.dispose();
+            }
+        });
+        saveChangesButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (ToolTable != null && ToolTable.isEditing()) {
+                    // Force the active cell editor to stop editing and commit the value to TableModel
+                    boolean success = ToolTable.getCellEditor().stopCellEditing();
+
+                    if (success) {
+                        updateToolLabel("Changes saved successfully!");
+                    } else {
+                        showError("Could not commit cell edit.");
+                    }
+                } else {
+                    updateToolLabel("No active cell editing to save.");
+                }
             }
         });
     }

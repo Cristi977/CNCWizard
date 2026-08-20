@@ -197,7 +197,7 @@ public class TableModel extends AbstractTableModel {
                             if (matcher.find()) {
                                 System.out.println("FOUND MATCH in file: " + line);
 
-                                String replacementBlock = "(T" + newTValue + " T<" + GCodeParser.currentState.E80050 + newTValue + ">)";
+                                String replacementBlock = "(T" + newTValue + " T<" + GCodeParser.currentState.getE80050FirstDigit() + newTValue + ">)";
 
                                 String newLine = line.substring(0, matcher.start()) +
                                         replacementBlock +

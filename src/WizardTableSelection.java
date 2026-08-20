@@ -18,20 +18,20 @@
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
 
 public class WizardTableSelection extends JFrame{
     private JPanel MainPanel;
     private JLabel Table;
-    private JLabel TableValue;
     private JButton backButton;
     private JButton nextButton;
+    private JLabel ToolIndexValue;
 
     public WizardTableSelection(){
-        String table = GCodeParser.getCurrentState().E80050;
-        //aditional processing: switch(table): case
-        TableValue.setText(table);
-        // if u need 34, let: TableValue.setText(String.valueOf(table));
+        Table.setText("Table: " + GCodeParser.currentState.getE80050FirstDigit());
+        ToolIndexValue.setText("Tool Index: " + GCodeParser.currentState.getE80050ToolIndex());
+        System.out.println("DEBUG - First Digit: " + GCodeParser.currentState.getE80050FirstDigit());
+        System.out.println("DEBUG - Tool Index: " + GCodeParser.currentState.getE80050ToolIndex());
+
         nextButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {

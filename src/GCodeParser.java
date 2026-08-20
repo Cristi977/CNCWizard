@@ -66,9 +66,8 @@ public class GCodeParser {
                     currentState.E30050.put(currentNBlock, (double) val);
                 }
 
-                if (mvar.equals("E80050")) {
-                    currentState.E80050 = String.valueOf(val);
-                    currentState.machineVariable = val;
+                if (mvar.equals("E80050")&& currentNBlock != null) {
+                    currentState.E80050 =val;
                 }
 
                 targetState.machineVariables.put(mvar, (double) val);
