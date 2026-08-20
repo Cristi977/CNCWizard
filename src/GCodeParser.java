@@ -1,4 +1,22 @@
+/*
+ * GCodeParser.java - translates the CNC program into specific structures
+ *
+ * Copyright 2026 Cristian Boitor
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
@@ -6,88 +24,90 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class GCodeParser {
-    // Starea curenta a masinii "in timp real"
     public static MachineState currentState = new MachineState();
     public static MachineState getCurrentState(){return currentState;}
+    public static File activeProgramFile;
+    public static Map<String, File> subprogramFiles = new HashMap<>();
+    public static File baseDirectory;
 
-    // Istoricul salvarilor pe blocuri N (Ex: "N0090" -> Starea la acel moment)
     public static Map<String, MachineState> sequenceHistory = new LinkedHashMap<>();
 
-    private static final Pattern CNC_PATTERN = Pattern.compile("^([A-Za-z]+)([-+]?[0-9]*\\.?[0-9]*)$");
+    // STRICT INTEGER REGEX: No decimal points allowed
+    private static final Pattern TOKEN_PATTERN = Pattern.compile("(?<mvar>[A-Za-z]+[0-9]*)\\s*=\\s*(?<mval>[-+]?[0-9]+)|(?<wprefix>[A-Za-z]+)(?<wval>[-+]?[0-9]+)");
 
-    // ==========================================
-    // 3. THE PARSER LOGIC
-    // ==========================================
     public static void parseLine(String line, MachineState targetState) {
-
         boolean isG178Line = line.contains("G178");
         boolean isG151Line = line.contains("G151");
-        
-        String[] tokens = line.split("[\\s&]+");
+
+        // 1. Strip comments
+        String cleanLine = line.replaceAll("\\(.*?\\)", "").trim();
+        if (cleanLine.isEmpty()) return;
+
         String currentNBlock = null;
 
-        for (String token : tokens) {
-            if (token.isEmpty()) continue;
+        // 2. Pre-scan for N-block
+        Matcher nMatcher = Pattern.compile("N[0-9]+").matcher(cleanLine);
+        if (nMatcher.find()) {
+            currentNBlock = nMatcher.group().toUpperCase();
+        }
 
-            // Handle Macros (E80050=34)
-            if (token.contains("=")) {
-                String[] parts = token.split("=");
-                if (parts[0].equals("E30050")){
-                    currentState.E30050.put(currentNBlock, Double.parseDouble(parts[1]));
+        // 3. Match pure integer tokens
+        Matcher matcher = TOKEN_PATTERN.matcher(cleanLine);
+        while (matcher.find()) {
+
+            // --- MACRO HANDLING (e.g., E80050=34) ---
+            if (matcher.group("mvar") != null) {
+                String mvar = matcher.group("mvar").toUpperCase();
+                String mvalStr = matcher.group("mval");
+
+                int val = Integer.parseInt(mvalStr);
+
+                if (mvar.equals("E30050") && currentNBlock != null) {
+                    currentState.E30050.put(currentNBlock, (double) val);
                 }
-                if (parts[0].equals("E80050")){
-                    currentState.E80050 = Integer.parseInt(parts[1]);
+
+                if (mvar.equals("E80050")) {
+                    currentState.E80050 = String.valueOf(val);
+                    currentState.machineVariable = val;
                 }
-                if (parts.length == 2) {
-                    try {
-                        targetState.machineVariables.put(parts[0].toUpperCase(), Double.parseDouble(parts[1]));
-                    } catch (NumberFormatException e) {
-                        System.err.println("Skipping invalid macro: " + token);
+
+                targetState.machineVariables.put(mvar, (double) val);
+
+                // --- STANDARD G-CODE WORD HANDLING (e.g., G01, X100, T5) ---
+            } else if (matcher.group("wprefix") != null) {
+                String prefix = matcher.group("wprefix").toUpperCase();
+                int number = Integer.parseInt(matcher.group("wval"));
+
+                if (prefix.equals("N")) {
+                    // Handled by pre-scan above
+                } else if (prefix.equals("T")) {
+                    currentState.T.put(currentNBlock, (double) number);
+                } else if (prefix.equals("G") || prefix.equals("M")) {
+                    // Ignored or stored if needed
+                } else {
+                    if (isG178Line) {
+                        targetState.g178.put(prefix, (double) number);
+                    } else if (isG151Line) {
+                        targetState.g151.put(prefix, (double) number);
+                    } else {
+                        targetState.machineVariables.put(prefix, (double) number);
                     }
                 }
-            } else {
-                Matcher matcher = CNC_PATTERN.matcher(token);
-                if (matcher.matches()) {
-                    try {
-                        String prefix = matcher.group(1).toUpperCase();
-                        double number = Double.parseDouble(matcher.group(2));
-                        // Daca gasim un N-Code, inregistram blocul curent
-                        if (prefix.equals("N")) {
-                            currentNBlock = token.toUpperCase(); // ex: N0090
-                        } else if (prefix.equals("T")) {
-                            currentState.T.put(currentNBlock, number);
-                        } else if (prefix.equals("G") || prefix.equals("M")) {
-                            // (G and M could be stored in targetState if you want to track them)
-                        }
-                        else {
-                            if (isG178Line) {
-                                targetState.g178.put(prefix, number);
-                            } else if (isG151Line) {
-                                targetState.g151.put(prefix, number);
-                            } else {
-                                targetState.machineVariables.put(prefix, number);
-                            }
-                        }
-                    } catch (NumberFormatException ignored) {}
-                }
-            }
-            // 5. DETECT SUBPROGRAM CALLS
-            // Adjust this check based on how your files call subprograms (e.g., .num, CALL, M98)
-            if (targetState == currentState && line.contains("CLS")) {  //targetState == currentState just to be sure if nested subprograms
-                handleSubprogramCall(line, currentNBlock);
-                return;
             }
         }
 
-        // Save a snapshot at the end
+        // 4. Detect subprogram calls
+        if (targetState == currentState && line.contains("CLS")) {
+            handleSubprogramCall(line, currentNBlock);
+            return;
+        }
+
+        // 5. Save snapshot
         if (currentNBlock != null && targetState == currentState) {
             sequenceHistory.put(currentNBlock, new MachineState(currentState));
         }
     }
 
-    // ==========================================
-    // 6. SUBPROGRAM HANDLER
-    // ==========================================
     private static void handleSubprogramCall(String subprogramName, String currentNblock) {
         System.out.println("Found subprogram call in line: " + subprogramName);
 
@@ -95,19 +115,32 @@ public class GCodeParser {
         Matcher matcher = namePattern.matcher(subprogramName);
         if (matcher.find()){
             String subprogram = matcher.group(1);
+
+            File subFile;
+            if (baseDirectory != null) {
+                subFile = new File(baseDirectory, subprogram);
+            } else {
+                subFile = new File(subprogram);
+            }
+
+            subprogramFiles.put(currentNblock, subFile);
+
+            subprogramFiles.keySet().stream().sorted().forEach(blockKey -> {
+                System.out.println("saved subprograms: " + blockKey +" "+ subprogramFiles.get(blockKey));
+            });
+
             MachineState subprogramState = new MachineState();
-            String subNumber = matcher.group(2);
             String tool = matcher.group(3);
             currentState.tools.put(currentNblock, tool);
 
             try {
-                BufferedReader buffer = new BufferedReader(new FileReader(subprogram));
+                BufferedReader buffer = new BufferedReader(new FileReader(subFile));
                 String line = "";
-                Map<String, Object> atributes = new HashMap<>();
                 while ((line = buffer.readLine()) != null) {
                     GCodeParser.parseLine(line, subprogramState);
                 }
-            }catch(IOException e){
+                buffer.close();
+            } catch(IOException e){
                 System.out.println("Subprogram parsing error");
             }
             currentState.compareWithSubprogram(subprogramState, subprogram);
@@ -115,16 +148,11 @@ public class GCodeParser {
     }
 
     public static void clearMemory() {
-        // Empty the existing object's data instead of replacing the object itself
         currentState.machineVariables.clear();
         currentState.g178.clear();
         currentState.g151.clear();
         currentState.E30050.clear();
         currentState.tools.clear();
-
-        // Clear the history map
         sequenceHistory.clear();
     }
 }
-//TO DO:
-//  -baga datele in tabelul din WizardTool -> baga cumva subNumber in cheia de la E30050 ca sa o folosesti ca primary key
