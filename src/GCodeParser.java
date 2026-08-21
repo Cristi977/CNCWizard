@@ -146,6 +146,93 @@ public class GCodeParser {
             currentState.compareWithSubprogram(subprogramState, subprogram);
         }
     }
+    public static void autoSyncToolIndices() {
+        if (activeProgramFile == null || !activeProgramFile.exists()) {
+            System.out.println("AutoSync Aborted: No active program file found.");
+            return;
+        }
+
+        System.out.println("--- Starting AutoSync for E80050 and T commands ---");
+
+        try {
+            java.nio.file.Path path = activeProgramFile.toPath();
+            List<String> lines = java.nio.file.Files.readAllLines(path);
+            boolean modified = false;
+
+            // Grab the maps directly from the current state (this matches what TableModel used)
+            Map<String, Double> tMap = currentState.T;
+            Map<String, Integer> e80050Map = currentState.E80050;
+
+            if (tMap == null || tMap.isEmpty()) {
+                System.out.println("AutoSync Warning: T map is empty or null. Did the file parse correctly?");
+                return;
+            }
+
+            System.out.println("AutoSync: Found " + tMap.size() + " T-commands in memory to check.");
+
+            // Loop through all sequence keys that have a T command
+            for (String nBlockKey : tMap.keySet()) {
+
+                // Check if this same sequence key also has an E80050 command
+                if (e80050Map != null && e80050Map.containsKey(nBlockKey)) {
+
+                    int currentTValue = tMap.get(nBlockKey).intValue();
+                    int rawE80050 = e80050Map.get(nBlockKey);
+
+                    // Modulo 100 gets the last 2 digits of the T command
+                    int tToolIndex = currentTValue % 100;
+
+                    // Determine table base value using your existing method
+                    char firstDigit = currentState.getE80050FirstDigit(nBlockKey);
+                    int tableBaseValue = 0;
+                    switch (firstDigit) {
+                        case '0': tableBaseValue = 30; break;
+                        case '1': tableBaseValue = 70; break;
+                        case '2': tableBaseValue = 110; break;
+                    }
+
+                    if (tableBaseValue > 0) {
+                        int e80050ToolIndex = rawE80050 - tableBaseValue;
+
+                        // If mismatch detected, correct it
+                        if (e80050ToolIndex != tToolIndex) {
+                            int reconstructedE80050 = tableBaseValue + tToolIndex;
+                            System.out.println(">> MISMATCH IN " + nBlockKey + "! T=" + tToolIndex + ", E80050=" + e80050ToolIndex);
+                            System.out.println(">> Autocorrecting file to: " + reconstructedE80050);
+
+                            // Find the line in the file and replace it safely
+                            for (int i = 0; i < lines.size(); i++) {
+                                String line = lines.get(i);
+                                if (line.contains(nBlockKey) && line.contains("E80050")) {
+                                    String updatedLine = line.replaceAll("E80050\\s*=\\s*" + rawE80050, "E80050=" + reconstructedE80050);
+                                    if (!line.equals(updatedLine)) {
+                                        lines.set(i, updatedLine);
+                                        modified = true;
+
+                                        // Update backend memory instantly
+                                        e80050Map.put(nBlockKey, reconstructedE80050);
+                                    }
+                                }
+                            }
+                        } else {
+                            System.out.println("Block " + nBlockKey + " is perfectly synced. (T=" + tToolIndex + ")");
+                        }
+                    }
+                }
+            }
+
+            if (modified) {
+                java.nio.file.Files.write(path, lines);
+                System.out.println("--- AutoSync Complete: File was modified and saved! ---");
+            } else {
+                System.out.println("--- AutoSync Complete: No mismatches found, file untouched. ---");
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error auto-syncing tools in parser: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
 
     public static void clearMemory() {
         currentState.machineVariables.clear();

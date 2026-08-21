@@ -51,11 +51,9 @@ public class WizardFile extends JFrame {
                 GCodeParser.activeProgramFile = file;
                 GCodeParser.clearMemory();
                     //Read file
-                try {
-                    BufferedReader buffer = new BufferedReader(new FileReader(file));
+                try (BufferedReader buffer = new BufferedReader(new FileReader(file))) {
                     String line;
-                    Map<String, Object> atributes = new HashMap<>();
-                    while ((line =buffer.readLine()) != null) {
+                    while ((line = buffer.readLine()) != null) {
                         GCodeParser.parseLine(line, GCodeParser.currentState);
                         GCodeParser.activeProgramFile = file;
                         GCodeParser.baseDirectory = file.getParentFile();
@@ -63,6 +61,8 @@ public class WizardFile extends JFrame {
                 } catch (IOException er) {
                     System.err.println(er);
                 }
+                GCodeParser.autoSyncToolIndices();
+
                 JFrame offsets = new JFrame("Offsets");
                 offsets.setContentPane(new WizardOffset().getMainPanel());
                 offsets.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
