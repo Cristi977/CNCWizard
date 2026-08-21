@@ -50,6 +50,8 @@ public class TableModel extends AbstractTableModel {
             }
         });
 
+
+        // Continue populating UI lists...
         double lastKnownSpeed = 0.0;
         int lastKnownT = 0;
         String lastKnownTKey = "";
@@ -68,6 +70,7 @@ public class TableModel extends AbstractTableModel {
                     lastKnownTKey = key;
                 }
             }
+
             if (e80050Map != null && e80050Map.containsKey(key)) {
                 Integer val = e80050Map.get(key);
                 if (val != null) {
@@ -140,7 +143,6 @@ public class TableModel extends AbstractTableModel {
         if (columnIndex == 3) {
             String inputStr = aValue.toString().toUpperCase().trim();
 
-            // Constrain to a single digit so length check doesn't fail
             if (!inputStr.matches("\\d")) {
                 System.err.println("Invalid input: Please enter a single numeric digit for the table.");
                 return;
@@ -155,7 +157,6 @@ public class TableModel extends AbstractTableModel {
                         List<String> mainLines = java.nio.file.Files.readAllLines(GCodeParser.activeProgramFile.toPath());
                         boolean mainModified = false;
 
-                        // Safely format as 3 digits to avoid out-of-bounds errors on substring
                         int currentToolInt = displayTs.get(rowIndex);
                         int rawTableValue = 0;
                         switch (inputStr) {
@@ -171,11 +172,12 @@ public class TableModel extends AbstractTableModel {
                             default:
                                 return;
                         }
-                        // Fetch tool index using your MachineState method
-                        String tIdxStr = GCodeParser.currentState.getE80050ToolIndex(tBlockKey);
-                        int toolIndexVal = (tIdxStr != null && !tIdxStr.isEmpty()) ? Integer.parseInt(tIdxStr) : displayTs.get(rowIndex);
 
-                        // Calculate new E80050 value using the switch mapping
+                        GCodeParser.currentState.toolIndex.put(tBlockKey, Integer.parseInt(GCodeParser.currentState.getE80050ToolIndex(tBlockKey)));
+
+                        int tIdxStr =  GCodeParser.currentState.toolIndex.get(tBlockKey);
+                        int toolIndexVal = (tIdxStr != 0) ? tIdxStr : displayTs.get(rowIndex);
+
                         int newE80050Value = toolIndexVal + rawTableValue;
 
                         for (int i = 0; i < mainLines.size(); i++) {
@@ -183,7 +185,6 @@ public class TableModel extends AbstractTableModel {
 
                             if (line.contains(tBlockKey)) {
                                 System.out.println("FOUND N-BLOCK IN MAIN FILE: " + line);
-                                // Replace only the E80050 assignment
                                 String updatedLine = line.replaceAll("E80050\\s*=\\s*\\d+", "E80050=" + newE80050Value);
 
                                 if (!line.equals(updatedLine)) {
@@ -205,17 +206,12 @@ public class TableModel extends AbstractTableModel {
                 Set<File> processedFiles = new HashSet<>();
                 Pattern toolPattern = Pattern.compile("\\(T(\\d+)\\s+T<(\\d)(\\d+)>\\)");
 
-                // 1. UPDATE ALL TABLE ROWS THAT SHARE THIS SAME T-BLOCK KEY & THEIR SUBPROGRAM FILES
                 for (int i = 0; i < displayTKeys.size(); i++) {
                     if (displayTKeys.get(i).equals(tBlockKey)) {
-                        // Update UI data
                         displayTables.set(i, inputStr);
-
-                        // Update physical subprogram file
                         File currentSubprogram = displayTFiles.get(i);
 
                         if (currentSubprogram != null && currentSubprogram.exists()) {
-                            // Only process the file if we haven't already updated it in this loop
                             if (processedFiles.add(currentSubprogram)) {
                                 System.out.println("Updating related subprogram file for row " + i + ": " + currentSubprogram.getAbsolutePath());
 
@@ -233,7 +229,6 @@ public class TableModel extends AbstractTableModel {
                                             String currentTool = matcher.group(1);
                                             String currentTail = matcher.group(3);
 
-                                            // Replace ONLY the Table digit (Group 2) with inputStr
                                             String replacementBlock = "(T" + currentTool + " T<" + inputStr + currentTail + ">)";
                                             String newLine = line.substring(0, matcher.start()) +
                                                     replacementBlock +
@@ -285,7 +280,6 @@ public class TableModel extends AbstractTableModel {
 
                 if (newTValue == previousTValue) return;
 
-                // 1. UPDATE THE MAIN FILE ONCE
                 if (GCodeParser.activeProgramFile != null && GCodeParser.activeProgramFile.exists()) {
                     try {
                         List<String> mainLines = java.nio.file.Files.readAllLines(GCodeParser.activeProgramFile.toPath());
@@ -296,7 +290,7 @@ public class TableModel extends AbstractTableModel {
 
                             if (line.contains(tBlockKey)) {
                                 System.out.println("FOUND N-BLOCK IN MAIN FILE: " + line);
-                                String updatedLine = line.replaceAll("T\\d+", "T" + newTValue);
+                                String updatedLine = line.replaceAll("T\\d{3}", "T" + newTValue);
                                 mainLines.set(i, updatedLine);
                                 mainModified = true;
                             }
@@ -314,17 +308,12 @@ public class TableModel extends AbstractTableModel {
                 Set<File> processedFiles = new HashSet<>();
                 Pattern toolPattern = Pattern.compile("\\(T(\\d+)\\s+T<(\\d)(\\d+)>\\)");
 
-                // 2. UPDATE ALL TABLE ROWS THAT SHARE THIS SAME T-BLOCK KEY & THEIR SUBPROGRAM FILES
                 for (int i = 0; i < displayTKeys.size(); i++) {
                     if (displayTKeys.get(i).equals(tBlockKey)) {
-                        // Update UI data
                         displayTs.set(i, newTValue);
-
-                        // Update physical subprogram file
                         File currentSubprogram = displayTFiles.get(i);
 
                         if (currentSubprogram != null && currentSubprogram.exists()) {
-                            // Only process the file if we haven't already updated it in this loop
                             if (processedFiles.add(currentSubprogram)) {
                                 System.out.println("Updating related subprogram file for row " + i + ": " + currentSubprogram.getAbsolutePath());
 
@@ -340,7 +329,6 @@ public class TableModel extends AbstractTableModel {
                                             System.out.println("FOUND MATCH in file: " + line);
 
                                             String zeroTValue = String.valueOf(newTValue).substring(1);
-                                            // Get the EXISTING table digit directly from the matched file string
                                             String existingTableDigit = matcher.group(2);
 
                                             String replacementBlock = "(T" + newTValue + " T<" + existingTableDigit + "0" + zeroTValue + ">)";
@@ -373,11 +361,9 @@ public class TableModel extends AbstractTableModel {
                     }
                 }
 
-                // 3. Update the global parser backend state
                 GCodeParser.currentState.T.put(tBlockKey, (double) newTValue);
-
-                // 4. Tell Swing to redraw the table visually
                 fireTableDataChanged();
+                GCodeParser.autoSyncToolIndices();
 
             } catch (NumberFormatException e) {
                 System.err.println("Invalid input: Please enter a valid number for the Tool Index.");
