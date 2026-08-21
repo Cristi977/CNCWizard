@@ -41,7 +41,7 @@ public class WizardFile extends JFrame {
                 String productCode = productCodeTField.getText();
                 String productType = productTypeTField.getText();
                     //Search file
-                String directory = "C:\\Users\\boito\\OneDrive\\Documente\\faculta\\practica\\prog"; //Change
+                String directory = "C:\Users\user\prog"; //Change
                 File file = SearchExplorer.findFile(directory, productCode + "_" + "TYP" + productType +".num");
                 if (file == null){
                     errorLabel.setText("File not found");
