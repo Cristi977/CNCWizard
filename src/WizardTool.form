@@ -8,36 +8,6 @@
     <properties/>
     <border type="none"/>
     <children>
-      <hspacer id="225c9">
-        <constraints>
-          <grid row="0" column="2" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
-        </constraints>
-      </hspacer>
-      <component id="7dddb" class="javax.swing.JButton" binding="nextButton" default-binding="true">
-        <constraints>
-          <grid row="1" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false">
-            <minimum-size width="50" height="30"/>
-          </grid>
-        </constraints>
-        <properties>
-          <text value="Next"/>
-        </properties>
-      </component>
-      <component id="9e77e" class="javax.swing.JButton" binding="backButton" default-binding="true">
-        <constraints>
-          <grid row="1" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false">
-            <minimum-size width="50" height="30"/>
-          </grid>
-        </constraints>
-        <properties>
-          <text value="Back"/>
-        </properties>
-      </component>
-      <hspacer id="cfd44">
-        <constraints>
-          <grid row="0" column="1" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
-        </constraints>
-      </hspacer>
       <scrollpane id="a79b7" binding="ScrollPanel">
         <constraints>
           <grid row="0" column="0" row-span="1" col-span="1" vsize-policy="7" hsize-policy="7" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
@@ -57,6 +27,27 @@
         </constraints>
         <properties>
           <text value=""/>
+        </properties>
+      </component>
+      <component id="15f02" class="javax.swing.JButton" binding="backButton" default-binding="true">
+        <constraints>
+          <grid row="1" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Back"/>
+        </properties>
+      </component>
+      <hspacer id="4eb26">
+        <constraints>
+          <grid row="0" column="1" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+        </constraints>
+      </hspacer>
+      <component id="f4f75" class="javax.swing.JButton" binding="saveChangesButton">
+        <constraints>
+          <grid row="1" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <text value="Save Changes"/>
         </properties>
       </component>
     </children>

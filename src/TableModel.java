@@ -29,14 +29,15 @@ public class TableModel extends AbstractTableModel {
     private final List<Double> displaySpeeds = new ArrayList<>();
     private final List<String> displayTKeys = new ArrayList<>();
     private final List<File> displayTFiles = new ArrayList<>();
+    private final List<String> displayTables = new ArrayList<>();
 
-    private final String[] columns = {"Sequence / N-Code", "Tool Used", "Tool Index (Editable)", "Speed / E30050"};
+    private final String[] columns = {"Sequence / N-Code", "Tool Used", "Tool Index (Editable)", "Selected Table"};
 
-    public TableModel(Map<String, String> toolMap, Map<String, Double> tMap, Map<String, Double> e30050Map) {
+    public TableModel(Map<String, String> toolMap, Map<String, Double> tMap, Map<String, Integer> e80050Map) {
         Set<String> allKeys = new HashSet<>();
         if (toolMap != null) allKeys.addAll(toolMap.keySet());
         if (tMap != null) allKeys.addAll(tMap.keySet());
-        if (e30050Map != null) allKeys.addAll(e30050Map.keySet());
+        if (e80050Map != null) allKeys.addAll(e80050Map.keySet());
 
         List<String> sortedKeys = new ArrayList<>(allKeys);
         sortedKeys.sort((k1, k2) -> {
@@ -52,10 +53,11 @@ public class TableModel extends AbstractTableModel {
         double lastKnownSpeed = 0.0;
         int lastKnownT = 0;
         String lastKnownTKey = "";
+        String lastKnownTableIndex = "0";
 
         for (String key : sortedKeys) {
-            if (e30050Map != null && e30050Map.containsKey(key)) {
-                Double val = e30050Map.get(key);
+            if (e80050Map != null && e80050Map.containsKey(key)) {
+                Integer val = e80050Map.get(key);
                 if (val != null) lastKnownSpeed = val;
             }
 
@@ -66,9 +68,15 @@ public class TableModel extends AbstractTableModel {
                     lastKnownTKey = key;
                 }
             }
+            if (e80050Map != null && e80050Map.containsKey(key)) {
+                Integer val = e80050Map.get(key);
+                if (val != null) {
+                    char firstDigit = GCodeParser.currentState.getE80050FirstDigit(key);
+                    lastKnownTableIndex = String.valueOf(firstDigit);
+                }
+            }
 
             if (toolMap != null && toolMap.containsKey(key)) {
-                // Since the subprogram is on the tool's N-block (key), fetch it here!
                 File currentFile = null;
                 if (GCodeParser.subprogramFiles != null) {
                     currentFile = GCodeParser.subprogramFiles.get(key);
@@ -80,6 +88,7 @@ public class TableModel extends AbstractTableModel {
                 displaySpeeds.add(lastKnownSpeed);
                 displayTKeys.add(lastKnownTKey);
                 displayTFiles.add(currentFile);
+                displayTables.add(lastKnownTableIndex);
             }
         }
     }
@@ -101,8 +110,9 @@ public class TableModel extends AbstractTableModel {
 
     @Override
     public Class<?> getColumnClass(int col) {
+        if (col == 1) return String.class;
         if (col == 2) return Integer.class;
-        if (col == 3) return Double.class;
+        if (col == 3) return Integer.class;
         return String.class;
     }
 
@@ -112,23 +122,160 @@ public class TableModel extends AbstractTableModel {
             case 0: return displayNCodes.get(rowIndex);
             case 1: return displayTools.get(rowIndex);
             case 2: return displayTs.get(rowIndex);
-            case 3: return displaySpeeds.get(rowIndex);
+            case 3: return displayTables.get(rowIndex);
             default: return null;
         }
     }
 
     @Override
     public boolean isCellEditable(int rowIndex, int columnIndex) {
-        return columnIndex == 2;
+        return columnIndex == 2 || columnIndex == 3;
     }
 
     @Override
     public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
+        String tBlockKey = displayTKeys.get(rowIndex);
+        if (tBlockKey == null || tBlockKey.isEmpty()) return;
+
+        if (columnIndex == 3) {
+            String inputStr = aValue.toString().toUpperCase().trim();
+
+            // Constrain to a single digit so length check doesn't fail
+            if (!inputStr.matches("\\d")) {
+                System.err.println("Invalid input: Please enter a single numeric digit for the table.");
+                return;
+            }
+
+            try {
+                String previousTValue = displayTables.get(rowIndex);
+                if (inputStr.equals(previousTValue)) return;
+
+                if (GCodeParser.activeProgramFile != null && GCodeParser.activeProgramFile.exists()) {
+                    try {
+                        List<String> mainLines = java.nio.file.Files.readAllLines(GCodeParser.activeProgramFile.toPath());
+                        boolean mainModified = false;
+
+                        // Safely format as 3 digits to avoid out-of-bounds errors on substring
+                        int currentToolInt = displayTs.get(rowIndex);
+                        int rawTableValue = 0;
+                        switch (inputStr) {
+                            case "0":
+                                rawTableValue = 30;
+                                break;
+                            case "1":
+                                rawTableValue = 70;
+                                break;
+                            case "2":
+                                rawTableValue = 110;
+                                break;
+                            default:
+                                return;
+                        }
+                        // Fetch tool index using your MachineState method
+                        String tIdxStr = GCodeParser.currentState.getE80050ToolIndex(tBlockKey);
+                        int toolIndexVal = (tIdxStr != null && !tIdxStr.isEmpty()) ? Integer.parseInt(tIdxStr) : displayTs.get(rowIndex);
+
+                        // Calculate new E80050 value using the switch mapping
+                        int newE80050Value = toolIndexVal + rawTableValue;
+
+                        for (int i = 0; i < mainLines.size(); i++) {
+                            String line = mainLines.get(i);
+
+                            if (line.contains(tBlockKey)) {
+                                System.out.println("FOUND N-BLOCK IN MAIN FILE: " + line);
+                                // Replace only the E80050 assignment
+                                String updatedLine = line.replaceAll("E80050\\s*=\\s*\\d+", "E80050=" + newE80050Value);
+
+                                if (!line.equals(updatedLine)) {
+                                    mainLines.set(i, updatedLine);
+                                    mainModified = true;
+                                }
+                            }
+                        }
+
+                        if (mainModified) {
+                            java.nio.file.Files.write(GCodeParser.activeProgramFile.toPath(), mainLines);
+                            System.out.println("SUCCESSFULLY UPDATED E80050 IN MAIN FILE!");
+                        }
+                    } catch (IOException e) {
+                        System.err.println("Error updating main file: " + e.getMessage());
+                    }
+                }
+
+                Set<File> processedFiles = new HashSet<>();
+                Pattern toolPattern = Pattern.compile("\\(T(\\d+)\\s+T<(\\d)(\\d+)>\\)");
+
+                // 1. UPDATE ALL TABLE ROWS THAT SHARE THIS SAME T-BLOCK KEY & THEIR SUBPROGRAM FILES
+                for (int i = 0; i < displayTKeys.size(); i++) {
+                    if (displayTKeys.get(i).equals(tBlockKey)) {
+                        // Update UI data
+                        displayTables.set(i, inputStr);
+
+                        // Update physical subprogram file
+                        File currentSubprogram = displayTFiles.get(i);
+
+                        if (currentSubprogram != null && currentSubprogram.exists()) {
+                            // Only process the file if we haven't already updated it in this loop
+                            if (processedFiles.add(currentSubprogram)) {
+                                System.out.println("Updating related subprogram file for row " + i + ": " + currentSubprogram.getAbsolutePath());
+
+                                try (RandomAccessFile raf = new RandomAccessFile(currentSubprogram, "rw")) {
+                                    String line;
+                                    long lineStart = 0;
+
+                                    while ((line = raf.readLine()) != null) {
+                                        long lineEnd = raf.getFilePointer();
+
+                                        Matcher matcher = toolPattern.matcher(line);
+                                        if (matcher.find()) {
+                                            System.out.println("FOUND MATCH in file: " + line);
+
+                                            String currentTool = matcher.group(1);
+                                            String currentTail = matcher.group(3);
+
+                                            // Replace ONLY the Table digit (Group 2) with inputStr
+                                            String replacementBlock = "(T" + currentTool + " T<" + inputStr + currentTail + ">)";
+                                            String newLine = line.substring(0, matcher.start()) +
+                                                    replacementBlock +
+                                                    line.substring(matcher.end());
+
+                                            if (newLine.length() == line.length()) {
+                                                raf.seek(lineStart);
+                                                raf.writeBytes(newLine);
+                                                raf.seek(lineEnd);
+                                                System.out.println("SUCCESSFULLY WROTE TABLE INDEX TO FILE!");
+                                            } else {
+                                                System.err.println("BLOCKED BY LENGTH CHECK! Old length: " + line.length() + " | New length: " + newLine.length());
+                                            }
+                                        }
+                                        lineStart = lineEnd;
+                                    }
+                                } catch (IOException er) {
+                                    System.err.println("File write error: " + er);
+                                }
+                            }
+                        } else {
+                            if (currentSubprogram == null) {
+                                System.err.println("ERROR: File is NULL for row " + i);
+                            } else {
+                                System.err.println("ERROR: File object exists, but physical file NOT FOUND at: " + currentSubprogram.getAbsolutePath());
+                            }
+                        }
+                    }
+                }
+
+                fireTableDataChanged();
+
+            } catch (Exception e) {
+                System.err.println("Error processing Table Index: " + e.getMessage());
+            }
+        }
+
         if (columnIndex == 2) {
             String inputStr = aValue.toString().trim();
 
             if (!inputStr.matches("\\d{3}")) {
-                System.err.println("Invalid input: Please enter a numeric value up to 3 digits.");
+                System.err.println("Invalid input: Please enter a numeric value exactly 3 digits long.");
                 return;
             }
 
@@ -138,9 +285,7 @@ public class TableModel extends AbstractTableModel {
 
                 if (newTValue == previousTValue) return;
 
-                // Get the T-Block Key (used for updating table state & backend T values)
-                String tBlockKey = displayTKeys.get(rowIndex);
-                if (tBlockKey == null || tBlockKey.isEmpty()) return;
+                // 1. UPDATE THE MAIN FILE ONCE
                 if (GCodeParser.activeProgramFile != null && GCodeParser.activeProgramFile.exists()) {
                     try {
                         List<String> mainLines = java.nio.file.Files.readAllLines(GCodeParser.activeProgramFile.toPath());
@@ -149,14 +294,9 @@ public class TableModel extends AbstractTableModel {
                         for (int i = 0; i < mainLines.size(); i++) {
                             String line = mainLines.get(i);
 
-                            // Check if this line contains the correct N-block for this row
                             if (line.contains(tBlockKey)) {
                                 System.out.println("FOUND N-BLOCK IN MAIN FILE: " + line);
-
-                                // Update the T value or variable in the main file line
-                                // (Adjust this replacement depending on how your main file stores the T value, e.g., T5 -> T100)
                                 String updatedLine = line.replaceAll("T\\d+", "T" + newTValue);
-
                                 mainLines.set(i, updatedLine);
                                 mainModified = true;
                             }
@@ -171,58 +311,67 @@ public class TableModel extends AbstractTableModel {
                     }
                 }
 
-                // 1. UPDATE ALL TABLE ROWS THAT SHARE THIS SAME T-BLOCK KEY
+                Set<File> processedFiles = new HashSet<>();
+                Pattern toolPattern = Pattern.compile("\\(T(\\d+)\\s+T<(\\d)(\\d+)>\\)");
+
+                // 2. UPDATE ALL TABLE ROWS THAT SHARE THIS SAME T-BLOCK KEY & THEIR SUBPROGRAM FILES
                 for (int i = 0; i < displayTKeys.size(); i++) {
                     if (displayTKeys.get(i).equals(tBlockKey)) {
+                        // Update UI data
                         displayTs.set(i, newTValue);
-                    }
-                }
 
-                // 2. FETCH THE FILE DIRECTLY USING THE ROW'S PRE-MAPPED FILE
-                File currentSubprogram = displayTFiles.get(rowIndex);
+                        // Update physical subprogram file
+                        File currentSubprogram = displayTFiles.get(i);
 
-                if (currentSubprogram != null && currentSubprogram.exists()) {
-                    System.out.println("Found subprogram file for row " + rowIndex + ": " + currentSubprogram.getAbsolutePath());
+                        if (currentSubprogram != null && currentSubprogram.exists()) {
+                            // Only process the file if we haven't already updated it in this loop
+                            if (processedFiles.add(currentSubprogram)) {
+                                System.out.println("Updating related subprogram file for row " + i + ": " + currentSubprogram.getAbsolutePath());
 
-                    Pattern toolPattern = Pattern.compile("\\(T(\\d+)\\s+T<(\\d)(\\d+)>\\)");
+                                try (RandomAccessFile raf = new RandomAccessFile(currentSubprogram, "rw")) {
+                                    String line;
+                                    long lineStart = 0;
 
-                    try (RandomAccessFile raf = new RandomAccessFile(currentSubprogram, "rw")) {
-                        String line;
-                        long lineStart = 0;
+                                    while ((line = raf.readLine()) != null) {
+                                        long lineEnd = raf.getFilePointer();
 
-                        while ((line = raf.readLine()) != null) {
-                            long lineEnd = raf.getFilePointer();
+                                        Matcher matcher = toolPattern.matcher(line);
+                                        if (matcher.find()) {
+                                            System.out.println("FOUND MATCH in file: " + line);
 
-                            Matcher matcher = toolPattern.matcher(line);
-                            if (matcher.find()) {
-                                System.out.println("FOUND MATCH in file: " + line);
+                                            String zeroTValue = String.valueOf(newTValue).substring(1);
+                                            // Get the EXISTING table digit directly from the matched file string
+                                            String existingTableDigit = matcher.group(2);
 
-                                String replacementBlock = "(T" + newTValue + " T<" + GCodeParser.currentState.E80050 + newTValue + ">)";
+                                            String replacementBlock = "(T" + newTValue + " T<" + existingTableDigit + "0" + zeroTValue + ">)";
+                                            String newLine = line.substring(0, matcher.start()) +
+                                                    replacementBlock +
+                                                    line.substring(matcher.end());
 
-                                String newLine = line.substring(0, matcher.start()) +
-                                        replacementBlock +
-                                        line.substring(matcher.end());
-
-                                if (newLine.length() == line.length()) {
-                                    raf.seek(lineStart);
-                                    raf.writeBytes(newLine);
-                                    raf.seek(lineEnd);
-                                    System.out.println("SUCCESSFULLY WROTE TO FILE!");
-                                } else {
-                                    System.err.println("BLOCKED BY LENGTH CHECK! Old length: " + line.length() + " | New length: " + newLine.length());
+                                            if (newLine.length() == line.length()) {
+                                                raf.seek(lineStart);
+                                                raf.writeBytes(newLine);
+                                                raf.seek(lineEnd);
+                                                System.out.println("SUCCESSFULLY WROTE TOOL INDEX TO FILE!");
+                                            } else {
+                                                System.err.println("BLOCKED BY LENGTH CHECK! Old length: " + line.length() + " | New length: " + newLine.length());
+                                            }
+                                        }
+                                        lineStart = lineEnd;
+                                    }
+                                } catch (IOException er) {
+                                    System.err.println("File write error: " + er);
                                 }
                             }
-                            lineStart = lineEnd;
+                        } else {
+                            if (currentSubprogram == null) {
+                                System.err.println("ERROR: File is NULL for row " + i);
+                            } else {
+                                System.err.println("ERROR: File object exists, but physical file NOT FOUND at: " + currentSubprogram.getAbsolutePath());
+                            }
                         }
-                    } catch (IOException er) {
-                        System.err.println("File write error: " + er);
                     }
-                } else {
-                    if (currentSubprogram == null) {
-                        System.err.println("ERROR: File is NULL for row " + rowIndex);
-                    } else {
-                        System.err.println("ERROR: File object exists, but physical file NOT FOUND at: " + currentSubprogram.getAbsolutePath());
-                    }                }
+                }
 
                 // 3. Update the global parser backend state
                 GCodeParser.currentState.T.put(tBlockKey, (double) newTValue);

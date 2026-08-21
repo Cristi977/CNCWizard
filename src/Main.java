@@ -24,3 +24,6 @@ public static void main(String[] args) {
         }
     });
 }
+/*TODO:
+* - bound the E80050 tool index with the T value
+ */
