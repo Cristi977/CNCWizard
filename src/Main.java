@@ -25,5 +25,5 @@ public static void main(String[] args) {
     });
 }
 /*TODO:
-*
+*    - create a way to select the root directory
  */
