@@ -63,8 +63,8 @@ public class WizardFile extends JFrame {
                 } catch (IOException er) {
                     System.err.println(er);
                 }
-                JFrame offsets = new JFrame("table selection");
-                offsets.setContentPane(new WizardTableSelection().getMainPanel());
+                JFrame offsets = new JFrame("Offsets");
+                offsets.setContentPane(new WizardOffset().getMainPanel());
                 offsets.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
                 offsets.setSize(700, 600);
                 offsets.setLocationRelativeTo(null);
